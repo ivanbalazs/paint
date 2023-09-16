@@ -10,6 +10,7 @@ interface MouseCoords {
 
 interface BrushProperties {
   size: number;
+  opacity: number;
 }
 
 interface BrushColor {
@@ -29,7 +30,7 @@ enum MouseButton {
 class Paint {
   canvas: HTMLCanvasElement;
   brushType: BrushType;
-  brushColor: BrushColor = { primary: 'red', secondary: 'black' };
+  brushColor: BrushColor = { primary: '#ff0000', secondary: '#000000' };
   brushProperties: BrushProperties;
   private context: CanvasRenderingContext2D | null;
   private isDrawing: boolean = false;
@@ -43,6 +44,7 @@ class Paint {
     this.brushType = Object.values(BrushType)[0];
     this.brushProperties = {
       size: 5,
+      opacity: 100,
     };
     if (options?.width) {
       canvas.width = options.width;
@@ -53,9 +55,28 @@ class Paint {
     this.registerWindowListeners();
   }
 
+  setPrimaryBrushColor(color: string) {
+    this.brushColor.primary = color;
+  }
+  setSecondaryBrushColor(color: string) {
+    this.brushColor.secondary = color;
+  }
+  setBrushSize(size: number) {
+    this.brushProperties.size = size;
+  }
+  setBrushOpacity(value: number) {
+    if (value < 1 || value > 100) {
+      throw new Error('Opacity value must be between 1 and 100');
+    }
+    this.brushProperties.opacity = value;
+  }
+
   private registerWindowListeners() {
     const registerCoords = (e: MouseEvent) => {
-      this.coords = { x: e.x, y: e.y };
+      this.coords = {
+        x: e.x - this.canvas.offsetLeft + window.scrollX,
+        y: e.y - this.canvas.offsetTop + window.scrollY,
+      };
       this.button = { 1: MouseButton.LEFT, 2: MouseButton.RIGHT }[e.buttons];
     };
     this.canvas.addEventListener('mousedown', e => {
@@ -76,6 +97,7 @@ class Paint {
     const { x: px, y: py } = this.prevCoords ?? {};
     const ctx = this.context;
     const color = this.button === MouseButton.LEFT ? this.brushColor.primary : this.brushColor.secondary;
+    ctx.globalAlpha = this.brushProperties.opacity / 100;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, this.brushProperties.size, 0, Math.PI * 2);
@@ -94,7 +116,7 @@ class Paint {
         ctx.closePath();
       }
     }
-    this.prevCoords = this.coords;
+    this.prevCoords = { ...this.coords };
   }
 
   private animate() {
@@ -107,6 +129,41 @@ class Paint {
 const canvas = document.getElementById('canvas');
 
 const paint = new Paint(canvas as HTMLCanvasElement, {
-  width: window.innerWidth,
-  height: window.innerHeight,
+  width: 600,
+  height: 600,
+});
+
+const colorPrimaryInput = <HTMLInputElement>document.getElementById('color-primary');
+const colorSecondaryInput = <HTMLInputElement>document.getElementById('color-secondary');
+const brushSizeInput = <HTMLInputElement>document.getElementById('brush-size');
+const brushOpacityInput = <HTMLInputElement>document.getElementById('brush-opacity');
+const updateBrushSizeIndicator = () => {
+  document.getElementById('brush-size-indicator')!.textContent = brushSizeInput.value;
+};
+const updateBrushOpacityIndicator = () => {
+  document.getElementById('brush-opacity-indicator')!.textContent = brushOpacityInput.value;
+};
+
+colorPrimaryInput.value = paint.brushColor.primary;
+colorSecondaryInput.value = paint.brushColor.secondary;
+brushSizeInput.value = `${paint.brushProperties.size}`;
+brushOpacityInput.value = `${paint.brushProperties.opacity}`;
+updateBrushSizeIndicator();
+updateBrushOpacityIndicator();
+
+colorPrimaryInput.addEventListener('change', e => {
+  paint.setPrimaryBrushColor((e.target as HTMLInputElement).value);
+});
+colorSecondaryInput.addEventListener('change', e => {
+  paint.setSecondaryBrushColor((e.target as HTMLInputElement).value);
+});
+brushSizeInput.addEventListener('input', e => {
+  const value = +(e.target as HTMLInputElement).value;
+  paint.setBrushSize(value);
+  updateBrushSizeIndicator();
+});
+brushOpacityInput.addEventListener('input', e => {
+  const value = +(e.target as HTMLInputElement).value;
+  paint.setBrushOpacity(value);
+  updateBrushOpacityIndicator();
 });
